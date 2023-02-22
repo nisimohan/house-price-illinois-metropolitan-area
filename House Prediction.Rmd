@@ -1,0 +1,753 @@
+---
+title: "**Exploring the effect of different features on house prices using multiple machine learning algorithms, and analyzing how accurate a model can predict the sales price of houses in Illinois metropolitan area.**"  
+subtitle: "DSCI 401 Machine Learning 2"   
+author: "Nisi Mohan Kuniyil"    
+date: "`r Sys.Date()`"    
+output: 
+  pdf_document:
+    toc: true
+    toc_depth: 2
+header-includes:
+  - \usepackage{titling}
+  - \pretitle{\begin{center}
+  - \includegraphics[width= 10in,height= 10in]{download.jpg}\LARGE\\}
+  - \posttitle{\end{center}}
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(cache = FALSE)
+```
+
+
+
+```{r, echo=FALSE}
+library(reshape2)
+library(ggplot2)
+library(dplyr)
+library(GGally)
+library(rsample)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(gbm)
+library(xgboost)
+
+```
+
+
+
+
+\newpage
+
+# Executive Summary
+
+Real estate is one of the complex markets in the world and there is a growing interest in applying data science practices to understand the factors that are driving the sales price of houses. The availability of a vast amount of data opens up the possibilities of training machine learning models to extract insights and better understand property pricing in the market. This project aims to research these possibilities by applying multiple machine learning algorithms; decision tree, random forest, and gradient boosting on the Illinois data.
+
+The Illinois real estate data records observations of different houses in the Illinois area. The dataset includes a wide range of features and their corresponding sales price. To gain insights into these features and how they impact property prices, we train multiple regression models with different algorithms and analyze how different features help the model predict the prices.  To effectively evaluate different models and understand how the models will perform in a real-world setting,  the dataset is split into two groups (training and test set) and only the training set is made accessible to the model. After training, predictions are made against the test set and the model performance is evaluated using a metric called RMSE (Root Mean Squared Error). The metric RMSE helps us understand how much the model was off in predicting the correct sales prices in the test set. The lower the RMSE the closer the model predictions are to the actual house prices. Setting up the training experiments in this fashion gives us a reliable method to understand how the model will perform in the real world. Also, this helps us avoid the model overfitting problem, where the model shows good performance on the data set it was trained on, but when deployed and evaluated on unseen data, the model becomes useless. Apart from the quantitative RMSE metric, we also evaluate the predictions made by the models using visualizations to figure out how close each prediction is to its corresponding actual prices. While the RMSE metric gives us an overall performance of the model, the visualizations enable us to individually inspect each data point in the test set and understand how the model performs for different segments of houses (eg: expensive vs non-expensive).
+
+Using the experiment and evaluation strategies mentioned above, three types of regression models were trained using a decision tree, random forest, and gradient boosting algorithms. The random forest regressor model performed the best on the unseen test data set with the lowest RMSE score as well as having consistent predictions for all the data points in the test set. Also, using random forest we were able to extract the most important features the model used to make its decisions and predict the house prices. Using this random forest feature importance analysis, we are able to get a solid understanding of the factors that has a major impact on the sales prices of houses in the Illinois area.
+
+To summarise, this project explored three different machine learning models to check if there exist meaningful features in the Illinois dataset that can be used to accurately predict the sales prices of houses. Although we were able to achieve decent predictive performance with all three of the models we trained, the random forest algorithm gave us the best performance on the test set as well as provided insights into the most important features that are driving the market.
+
+
+
+# Introduction
+
+
+The real estate market is a highly variable market where property prices are driven by a lot of factors. No matter what the circumstances are now, the demand for housing continues to grow as same as before the pandemic. The housing bubble is a serious concern for the property-buying people, and it will help the buyers and sellers if they can understand the factors driving the housing price. Now that we live in a world of Big Data, there is a lot of data available to analyze the statistical and contextual factors that have an influence on housing prices.
+
+This project will analyze the Illinois real estate data and identify meaningful features from a large set of potential factors that has a major impact on property prices. Multiple machine learning algorithms will be applied to the dataset to compare and contrast the importance of different features in predicting the market prices of properties.
+
+
+
+# Objective
+
+
+To build multiple machine learning models like Decision Tree, Random Forest, and Gradient Boosting to predict the housing price and analyze the feature importance in predicting the price. Before building a model Exploratory Data Analysis(EDA) will be conducted to obtain a better understanding of our data. This will help in choosing the important features and thus help improve the performance of our models.
+ 
+ 
+
+# Source 
+
+
+The Illinois real estate dataset is used for the analysis of housing price. 
+
+## Understanding the raw data:
+
+(a) There are 82 variables (81 independent variables — Features and 1 dependent variable — Target Variable).
+(b) The data types are either integers or characters.
+(c) There are 13997 missing values in our dataset. 
+
+
+
+# Tidying and Exploratory Data Analysis
+
+To get insights into the sale price we produce a distribution plot of housing price from our data. The distribution of sales price is positively skewed, where the mean(186298) is usually to the right of the median (165500).
+
+NA's are handled by checking all the features in our dataset, and we remove columns that are having the highest number of NA's. "Alley, Pool.QC,Fence,Misc.Feature, Fireplace.Qu, and Lot.Frontage" are the features we remove from the dataset. Once we remove these columns, the rest of the NA's are handled by just omitting them. We didn't do the NA omit before removing the above-mentioned columns. Because if we had handled NA's by just removing all NA's from our original dataset, it would have affected our total number of rows leaving us with very few rows for our modeling. By handling NA's like this we only lost 6% of our data.
+
+
+
+
+```{r,echo=FALSE}
+
+
+housing_data <- read.csv("HousesSoldData.csv", stringsAsFactors = TRUE)
+#head(housing_data)
+
+
+```
+
+
+
+
+```{r,echo=FALSE}
+
+ggplot(data=housing_data, aes(housing_data$SalePrice)) + 
+  geom_histogram(aes(y =..density..), 
+                 col="deepskyblue4", 
+                 fill="deepskyblue4", 
+                 alpha=.2) + 
+  geom_density(col=2)+
+  labs(title = "Histogram for Sales Price in Illinois Area", x= "Sales Price")
+
+```
+
+
+## Feature Selection
+
+Our data has 82 features in total. It is not advised to use all of the features in our model prediction due to the risk of overfitting. Therefore, the best thing to do is to find out the correlation between these features and "SalePrice" and remove the features which do not have a high correlation
+
+Since we have 82 columns in our dataset, it will not be ideal to plot a correlation matrix. Here we used a manual feature selection by splitting the dataset into numeric and factor (all character columns are typecasted to factor for modeling). Then the numeric dataset is used to find out the correlation of features with respect to "SalePrice". We selected features that are having more than 0.4 value from the correlation table. An alternative option is to reduce the feature dimension using **PCA**.
+
+After extracting these columns, we combine the numerical and categorical datasets for our modeling.
+
+ 
+```{r,echo=FALSE}
+#names(which(colSums(is.na(housing_data)) > 0))
+housing_data <- housing_data %>% select(-c(Alley,Pool.QC,Fence,Misc.Feature,Fireplace.Qu,Lot.Frontage))
+
+
+```
+
+```{r,echo=FALSE}
+
+#sum(is.na(housing_data))
+housing_data<- na.omit(housing_data)
+#nrow(housing_data)
+```
+
+
+```{r,echo=FALSE}
+
+housing_numeric<- select_if(housing_data, is.numeric)
+housing_categorical <- select_if(housing_data, is.factor)
+
+
+```
+
+
+```{r,echo=FALSE}
+
+cor_housing<-as.data.frame(cor(housing_numeric[, -39], housing_numeric$SalePrice))
+corr_columns <- row.names(subset(cor_housing, V1 >=0.4))
+#corr_columns
+
+
+```
+
+
+```{r,echo=FALSE}
+
+housing_numeric<- housing_numeric[, corr_columns]
+#head(housing_numeric)
+
+```
+
+
+```{r, echo=FALSE}
+
+housing_data <- cbind(housing_numeric, housing_categorical)
+#housing_data
+#nrow(housing_data)
+#ncol(housing_data)
+
+```
+
+
+
+
+# Modeling
+
+
+
+Data is partitioned to 80-20 as training and test set before applying machine learning algorithm. 
+
+
+
+
+```{r,echo=FALSE}
+
+set.seed(42)
+
+partition <- createDataPartition(y= housing_data$SalePrice, p =0.80, list = FALSE)
+housing_train <- housing_data[partition,]
+housing_test <- housing_data[-partition,]
+#nrow(housing_train)/ nrow(housing_data) *100
+
+
+```
+
+
+
+## Decision Tree
+
+
+To first step in the decision tree is to build a full model with all the features. 10-fold cross-validation is applied in the decision tree algorithm. Since it is a regression tree we selected **ANOVA** as our method.
+
+From the rpart.plot visualization below we can see how the tree is partitioned. Node 1 includes all the rows and the first split is based on **Overall.Qual**. The first split separates our dataset to a node with Overall.Qual < 8 "Yes" and a node with Overall.Qual>8 "No". The first split creates a left node with 82% and a right node with 18%.
+
+The left node split is based on the neighborhood criteria, if the **neighborhood** falls under these categories; Blueste, BrDale, BrkSide, Edwards, IDOTRR, Landmark, MeadowV, Mitchel, NAmes, NPkVill, OldTown, Sawyer, SWISU, whereas the right node split is again based on the **Overall.Qual**. Similarly, each node is partitioned based on **Gr.Liv.Area, X1st.Flr.SF, Total.Bsmt.SF **, having a total of 21 nodes and has a depth of 5.
+
+
+
+```{r,echo=FALSE}
+
+set.seed(123)
+housing_price <- rpart(formula = SalePrice ~ .,
+                       data = housing_train,
+                       method = "anova",  # regression)
+                       xval = 10  # 10-fold cross-validation 
+                       )
+rpart.plot(housing_price, yesno = TRUE)
+
+```
+
+
+
+
+
+```{r,echo=FALSE}
+
+fullmod_pred <- predict( housing_price,housing_test, type= "vector")
+housingfullmodelPred_RMSE <- RMSE(pred = fullmod_pred,
+                            obs = housing_test$SalePrice)
+
+#housingfullmodelPred_RMSE
+```
+
+```{r,echo=FALSE}
+#printcp(housing_price)
+```
+
+
+Pruning complexity parameter (cp) plot illustrating the relative cross-validation error (y-axis) for various cp values (lower x-axis). Smaller cp values lead to larger trees. Using the 1-SE rule, a tree size of 10-12 provides optimal cross-validation results. From the plot, we can see that a tree size of 10 has the lowest CP value. From the regression tree output, we get the least xerror **0.28473** that corresponds to tree size 10. 
+
+
+```{r,echo=FALSE}
+plotcp(housing_price)
+```
+
+
+To compare the performance of the model we have chosen the loss function RMSE(Root Mean Squared Error). We will be using RMSE to explain the performance of the models throughout our project. RMSE is a mostly used error function in explaining the performance. We can compare RMSE with the standard deviation to understand how well the model can make predictions.
+
+
+The RMSE of the full model is **41805.53**, which is almost half the standard deviation of the target variable **80255.26**. 
+
+
+```{r,echo=FALSE}
+#housing_price$cptable[which.min(housing_price$cptable[,"xerror"]),"CP"] 
+```
+
+
+The next step is to prune the tree in order to avoid overfitting and see if there is any improvement in the model. The CP table shows the relevant statistics to choose the appropriate pruning parameter. As mentioned above from the CP table, we chose the CP corresponding to the xerror 0.28473. However, from tree size 8th onward the xerror is almost similar, so we chose the CP of the 8th tree which is **0.011663** for our model.
+
+
+
+
+```{r,echo=FALSE}
+housingPrune_Anova <- prune(housing_price, 
+                        cp = 0.011663)
+rpart.plot(housingPrune_Anova, yesno = TRUE)
+```
+
+
+```{r,echo=FALSE}
+
+housingPrice_pred <- predict( housingPrune_Anova,housing_test, type= "vector")
+
+housingPred_RMSE <- RMSE(pred = housingPrice_pred,
+                            obs = housing_test$SalePrice)
+#housingPred_RMSE
+
+```
+
+
+
+
+```{r, echo=FALSE}
+
+plot(housing_test$SalePrice, housingPrice_pred, 
+     main = "Simple Regression: Predicted vs. Actual",
+     xlab = "Actual",
+     ylab = "Predicted")
+abline(0, 1)
+
+```
+
+
+
+The pruning process leads to an average prediction error of 42303.02 in the test data set. It is not too bad considering the standard deviation of Sales Price is 80255.26.
+
+Looking at the plot of actual sales price vs predicted sales price, we can see that the variance is really high and all the predictions are not so close to its target sales price indicating a low accuracy in the model for predicting house prices.
+
+
+
+
+## Random Forest
+
+
+
+Next, a different supervised learning algorithm, random forest is used to predict the **SalePrice** and understand the feature importance in predicting housing price. A random forest uses a collection of weak decision trees to greatly reduce the overfitting problem. Therefore, we should achieve better performance on the test set. The model was trained on the training set with setting the importance flag set TRUE as we wanted to analyze the most important features that contribute to the predictions of house prices. Looking at the feature importance table, we could see that features **Gr.Liv.Area, Neighborhood, Overall.Qual, BsmtFin.SF.1, Total.Bsmt.SF, X1st.Flr.SF, Garage.Area, Fireplaces, Full.Bath, and Garage.Type **are the most relevant factors that affect house prices. The model's performance on the test set is RMSE the **27595.37**, which is a great improvement over the decision tree model.
+
+
+```{r, echo=FALSE}
+housing_rf <- randomForest(SalePrice ~ ., data = housing_train, importance = TRUE)
+#housing_rf
+```
+
+
+
+
+```{r,echo=FALSE}
+
+importance    <- importance(housing_rf)
+varImportance <- data.frame(Variables = row.names(importance), 
+                            Importance = round(importance[ ,'%IncMSE'],2))
+head(varImportance[order(-varImportance$Importance),],10)
+
+
+```
+
+```{r,echo=FALSE}
+housingRF_pred <- predict(housing_rf, housing_test, type = "response")
+#summary(housingRF_pred)
+housingPredRF_RMSE <- RMSE(pred = housingRF_pred,
+                            obs = housing_test$SalePrice)
+#housingPredRF_RMSE
+
+
+```
+
+
+
+```{r,echo=FALSE}
+
+plot(housing_test$SalePrice, housingRF_pred, 
+     main = "Random Forest Regression: Predicted vs. Actual",
+     xlab = "Actual",
+     ylab = "Predicted")
+abline(0,1)
+
+
+```
+
+Looking at the plot of actual sales price vs predicted sales price, we can see that the variance is really low and all the predictions are really close to its target sales price indicating a great accuracy in the model for predicting house prices.
+
+
+## Gradient Boosting
+
+Although we achieved great test set performance with the random forest model, we now explore a different machine learning model called gradient boosting to check if we can achieve even better accuracy in predicting the sales price. A GBM model was trained on the training set using multiple tree-depth as a hyperparameter and with a 10 fold cross-validation and achieved a test set RMSE **28259.19**. Although the model performed much better than the individual decision tree we trained. The random forest is still a better model when it comes to the test set performance.
+
+
+
+
+```{r,echo=FALSE}
+housing_gbm <- train(SalePrice ~ .,
+                      data = housing_train,
+                      method = "gbm",  # for bagged tree
+                      tuneLength = 5,  # choose up to 5 combinations of tuning parameters
+                      metric = "RMSE",  # evaluate hyperparamter combinations with ROC
+                      trControl = trainControl(
+                        method = "cv",  # k-fold cross validation
+                        number = 10,  # 10 folds
+                        savePredictions = "final",
+                        # verboseIter = FALSE,
+                        # returnData = TRUE
+                      ),
+                      verbose=FALSE
+
+                      )
+```
+
+
+
+```{r,echo=FALSE}
+
+plot(housing_gbm)
+
+```
+
+The plot above shows the model cross-validation performance for different values of the hyperparameters "tree depth". it clearly shows that tree depth 5 outperforms all the other values.
+
+
+```{r,echo=FALSE}
+
+housinggbm_pred <- predict(housing_gbm, housing_test, type = "raw")
+housingPredGBM_RMSE <- RMSE(pred = housinggbm_pred,
+                            obs = housing_test$SalePrice)
+#housingPredGBM_RMSE
+
+```
+
+
+```{r,echo=FALSE}
+
+plot(housing_test$SalePrice, housinggbm_pred, 
+     main = "Gradient Boosing Regression: Predicted vs. Actual",
+     xlab = "Actual",
+     ylab = "Predicted")
+abline(0,1)
+
+
+```
+
+The above target sales price vs predicted sales price also shows a good model fit and test set performance as the previous random forest model.
+
+
+
+
+
+# Conclusion
+
+
+This project examined the different factors associated with the Sale Price of houses in the Illinois area using supervised learning techniques on the Illinois real estate dataset. Fairly accurate and useful models were built using regression tree, random forest, and gradient boosting. Among these three models, random forest is the best performing model in predicting the sales price.
+
+
+
+
+
+# Appendix
+
+## CODE
+
+### Data Acquisition
+
+(a) Load Data
+
+```{r}
+
+
+housing_data <- read.csv("HousesSoldData.csv", stringsAsFactors = TRUE)
+head(housing_data)
+
+
+```
+
+
+
+
+(b) Understanding the datset.
+
+```{r}
+str(housing_data)
+
+
+```
+
+
+### Tidying Data and EDA
+
+```{r}
+
+ggplot(data=housing_data, aes(housing_data$SalePrice)) + 
+  geom_histogram(aes(y =..density..), 
+                 col="deepskyblue4", 
+                 fill="deepskyblue4", 
+                 alpha=.2) + 
+  geom_density(col=2)+
+  labs(title = "Histogram for Sales Price in Illinois Area", x= "Sales Price")
+
+```
+
+
+
+(c) Dropping the columns with highest no of NA's
+
+```{r}
+names(which(colSums(is.na(housing_data)) > 0))
+housing_data <- housing_data %>% select(-c(Alley,Pool.QC,Fence,Misc.Feature,Fireplace.Qu,Lot.Frontage))
+#head(housing_data)
+
+
+```
+
+
+(d) Removing NA's
+
+
+```{r}
+
+sum(is.na(housing_data))
+housing_data<- na.omit(housing_data)
+nrow(housing_data)
+```
+
+
+(e) split char and numeric 
+
+
+```{r}
+
+housing_numeric<- select_if(housing_data, is.numeric)
+housing_categorical <- select_if(housing_data, is.factor)
+
+
+```
+
+
+
+(f) finding the correlation of numeric columns
+
+```{r}
+
+cor_housing<-as.data.frame(cor(housing_numeric[, -39], housing_numeric$SalePrice))
+corr_columns <- row.names(subset(cor_housing, V1 >=0.4))
+corr_columns
+
+
+```
+
+
+(g) extract the above highly correlated columns 
+
+```{r}
+
+housing_numeric<- housing_numeric[, corr_columns]
+#head(housing_numeric)
+
+```
+
+(h) Combine both character and numerical dataset
+
+
+
+```{r}
+
+housing_data <- cbind(housing_numeric, housing_categorical)
+#housing_data
+nrow(housing_data)
+ncol(housing_data)
+
+```
+
+
+```{r}
+sum(is.na(housing_data))
+```
+
+
+
+### Modeling
+
+
+
+Splitting data set train and test using CV
+
+
+```{r}
+
+set.seed(42)
+
+partition <- createDataPartition(y= housing_data$SalePrice, p =0.80, list = FALSE)
+housing_train <- housing_data[partition,]
+housing_test <- housing_data[-partition,]
+nrow(housing_train)/ nrow(housing_data) *100
+
+
+```
+
+
+
+####  Decision Tree
+
+
+```{r}
+
+set.seed(123)
+housing_price <- rpart(formula = SalePrice ~ .,
+                       data = housing_train,
+                       method = "anova",  # regression)
+                       xval = 10  # 10-fold cross-validation 
+                       )
+rpart.plot(housing_price, yesno = TRUE)
+
+```
+
+
+
+
+```{r}
+printcp(housing_price)
+```
+
+```{r}
+plotcp(housing_price)
+```
+
+```{r}
+housing_price$cptable[which.min(housing_price$cptable[,"xerror"]),"CP"] 
+```
+
+```{r}
+housingPrune_Anova <- prune(housing_price, 
+                        cp = 0.011663)
+rpart.plot(housingPrune_Anova, yesno = TRUE)
+```
+
+
+```{r}
+
+housingPrice_pred <- predict( housingPrune_Anova,housing_test, type= "vector")
+
+housingPred_RMSE <- RMSE(pred = housingPrice_pred,
+                            obs = housing_test$SalePrice)
+housingPred_RMSE
+
+```
+
+
+
+```{r}
+
+
+sd(housing_data$SalePrice)
+```
+
+
+#### Random Forest
+
+```{r}
+housing_rf <- randomForest(SalePrice ~ ., data = housing_train, importance = TRUE)
+housing_rf
+```
+
+
+
+
+```{r}
+
+importance    <- importance(housing_rf)
+varImportance <- data.frame(Variables = row.names(importance), 
+                            Importance = round(importance[ ,'%IncMSE'],2))
+head(varImportance[order(-varImportance$Importance),],10)
+
+
+```
+
+```{r}
+housingRF_pred <- predict(housing_rf, housing_test, type = "response")
+summary(housingRF_pred)
+housingPredRF_RMSE <- RMSE(pred = housingRF_pred,
+                            obs = housing_test$SalePrice)
+housingPredRF_RMSE
+
+
+```
+
+
+
+```{r}
+
+plot(housing_test$SalePrice, housingRF_pred, 
+     main = "Random Forest Regression: Predicted vs. Actual",
+     xlab = "Actual",
+     ylab = "Predicted")
+abline(0,1)
+
+
+```
+
+#### Gradient Boosting
+
+
+```{r}
+sum(is.na(housing_train))
+```
+
+
+```{r}
+housing_gbm <- train(SalePrice ~ .,
+                      data = housing_train,
+                      method = "gbm",  
+                      tuneLength = 5,  # choose up to 5 combinations of tuning parameters
+                      metric = "RMSE",  
+                      trControl = trainControl(
+                        method = "cv",  # k-fold cross validation
+                        number = 10,  # 10 folds
+                        savePredictions = "final",
+                        # verboseIter = FALSE,
+                        # returnData = TRUE
+                      ),
+                      verbose=FALSE
+
+                      )
+```
+
+
+
+```{r}
+
+plot(housing_gbm)
+
+```
+
+
+
+```{r}
+
+housinggbm_pred <- predict(housing_gbm, housing_test, type = "raw")
+housingPredGBM_RMSE <- RMSE(pred = housinggbm_pred,
+                            obs = housing_test$SalePrice)
+housingPredGBM_RMSE
+
+```
+
+
+```{r}
+
+plot(housing_test$SalePrice, housinggbm_pred, 
+     main = "Gradient Boosing Regression: Predicted vs. Actual",
+     xlab = "Actual",
+     ylab = "Predicted")
+abline(0,1)
+
+
+```
+
+
+
+
+## References
+
+
+https://medium.com/analytics-vidhya/kaggle-house-prices-prediction-with-linear-regression-and-gradient
+boosting-c5694d9c6df4      
+
+https://towardsdatascience.com/house-prices-prediction-using-deep-learning-dea265cc3154   
+
+https://www.datacamp.com/community/tutorials/decision-trees-R   
+
+
+
+
+
+
+
+

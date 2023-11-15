@@ -1,0 +1,73 @@
+---
+title: "DSCI401 Project Proposal"
+author: "Nisi Mohan Kuniyil"
+date: "11/11/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+```{r,echo=FALSE}
+library(foreign)
+
+```
+
+
+# Research Question
+
+**Exploring the effect of different features on house prices using multiple machine learning algorithms, and analyzing how accurate a model can predict the sales price of houses in Illinois metropolitan area.**
+
+
+
+The real estate market is a highly variable market where property prices are driven by a lot of factors. This project will analyze the Illinois real estate data and identify meaningful features from a large set of potential factors that has a major impact on property prices. Multiple machine learning algorithms will be applied to the dataset to compare and contrast the importance of different features in predicting the market prices of properties.
+
+Since the target label that needs to be predicted is a numeric value, we will look at different kinds of regression models. We will start with a decision tree regressor model which will not only predict the housing price value from a set of features but will also provide a tree of explanation the model used to predict the price. This will make it easier to interpret the model's prediction and what features it used primarily to arrive at the predicted value. We will then explore a more powerful machine learning model called random forest, which uses a collection of decision trees to predict the property price. The random forest algorithm should produce a much more accurate model and will give us insights into the importance of different features that affects property prices. Lastly, we will also explore the Gradient Boosting algorithm to check if we can get an even better predictive model than the random forest model.
+
+
+
+# Project Plan
+
+**1. HousesSoldData.csv**
+
+There are 82 variables and 2930 observations in this dataset. 
+
+
+```{r,echo=FALSE}
+
+
+
+housing <- read.csv("HousesSoldData.csv")
+str(housing)
+```
+
+
+**2. Data Tidying.**
+
+    
+**3. Visualization for exploratory data analysis.**   
+
+    
+**4. Building and Training a Decision Tree Model**
+
+    
+**5. Building and Training a Random Forest Model.**
+
+    
+**6. Building and Training a Gradient Boosting Model.**
+
+   
+
+
+
+# References 
+
+https://medium.com/analytics-vidhya/kaggle-house-prices-prediction-with-linear-regression-and-gradient-boosting-c5694d9c6df4
+
+https://towardsdatascience.com/house-prices-prediction-using-deep-learning-dea265cc3154
+
+
+
+
